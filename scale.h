@@ -14,17 +14,17 @@
 // [whole|fractional] word. eg 2.34 => [0x02,floor(0.34*256)]
 // The waveform is advanced only by the upper 'whole' byte.
 
-// The macro N calculates how fast the table pointer moves, and stores in a [whole|fractional] word.
-#define N(F) (short)( (F)*256.0*(float)P_COUNT/(float)SAMPLING_FREQ + 0.5 )
+// The macro calcW calculates how fast the table pointer moves, and stores in a [whole|fractional] word.
+#define calcW(F) (short)( (F)*256.0*(float)P_COUNT/(float)SAMPLING_FREQ + 0.5 )
 #define NOTES_COUNT 72
 rom near unsigned short W_table[NOTES_COUNT] = {
-//	B			C			C#			D			D#			E			F			F#			G			G#			A			A#
-	N(61.74),	N(65.41),	N(69.3),	N(73.42),	N(77.78),	N(82.41),	N(87.31),	N(92.50),	N(98.00),	N(103.83),	N(110.00),	N(116.54),
-	N(123.47),	N(130.81),	N(138.59),	N(146.83),	N(155.56),	N(164.81),	N(174.61),	N(185.00),	N(196.00),	N(207.65),	N(220.00),	N(233.08),	
-	N(246.94),	N(261.63),	N(277.18),	N(293.66),	N(311.13),	N(329.63),	N(349.23),	N(369.99),	N(392.00),	N(415.30),	N(440.00),	N(466.16),	
-	N(493.88),	N(523.25),	N(554.37),	N(587.33),	N(622.25),	N(659.26),	N(698.46),	N(739.99),	N(783.99),	N(830.61),	N(880.00),	N(932.33),	
-	N(987.77),	N(1046.50),	N(1108.73),	N(1174.66),	N(1244.51),	N(1318.51),	N(1396.91),	N(1479.98),	N(1567.98),	N(1661.22),	N(1760.00),	N(1864.66),	
-	N(1975.53),	N(2093.00),	N(2217.46),	N(2349.32),	N(2489.02),	N(2637.02),	N(2793.83),	N(2959.96),	N(3135.96),	N(3322.44),	N(3520.00),	N(3729.31),	
+//	B				C				C#				D				D#				E				F				F#				G				G#				A				A#
+	calcW(61.74),	calcW(65.41),	calcW(69.3),	calcW(73.42),	calcW(77.78),	calcW(82.41),	calcW(87.31),	calcW(92.50),	calcW(98.00),	calcW(103.83),	calcW(110.00),	calcW(116.54),
+	calcW(123.47),	calcW(130.81),	calcW(138.59),	calcW(146.83),	calcW(155.56),	calcW(164.81),	calcW(174.61),	calcW(185.00),	calcW(196.00),	calcW(207.65),	calcW(220.00),	calcW(233.08),	
+	calcW(246.94),	calcW(261.63),	calcW(277.18),	calcW(293.66),	calcW(311.13),	calcW(329.63),	calcW(349.23),	calcW(369.99),	calcW(392.00),	calcW(415.30),	calcW(440.00),	calcW(466.16),	
+	calcW(493.88),	calcW(523.25),	calcW(554.37),	calcW(587.33),	calcW(622.25),	calcW(659.26),	calcW(698.46),	calcW(739.99),	calcW(783.99),	calcW(830.61),	calcW(880.00),	calcW(932.33),	
+	calcW(987.77),	calcW(1046.50),	calcW(1108.73),	calcW(1174.66),	calcW(1244.51),	calcW(1318.51),	calcW(1396.91),	calcW(1479.98),	calcW(1567.98),	calcW(1661.22),	calcW(1760.00),	calcW(1864.66),	
+	calcW(1975.53),	calcW(2093.00),	calcW(2217.46),	calcW(2349.32),	calcW(2489.02),	calcW(2637.02),	calcW(2793.83),	calcW(2959.96),	calcW(3135.96),	calcW(3322.44),	calcW(3520.00),	calcW(3729.31),	
 };
 
 //Define Note name -> note number mappings

@@ -1,18 +1,19 @@
-#define W 0
-#define F 1
-
-#define RUN_CHANNEL(N, output) if (decay[N]) { 					\
-		/*wave_ptr[N] += velocity[N];*/							\
-		GET_USHORT(wave_ptr[0],0) += velocity[0];				\
-		if (STATUSbits.C) ++GET_UCHAR(wave_ptr[0],2);			\
-		/*Has the pointer reached beyond the wave table?*/		\
-		if (GET_UCHAR(wave_ptr[N],2) & WAVE_OVERFLOW_MASK) { 	\
-			/*Jump back to the start of the loop section.*/  	\
-			GET_USHORT(wave_ptr[N],1) -= LOOP_SIZE; 			\
-			/*Attenuate the output*/							\
-			decay[N]++; 										\
-		} 														\
-		/*Add to the output.*/									\
-		raw_level = wave_table[ GET_USHORT(wave_ptr[N],1) ];	\
-		output += (raw_level * decay_table[ decay[N] ])/256;	\
-}	
+#ifndef CHAN
+#error "CHAN must be defined"
+#endif
+if (decay[CHAN]) { 					
+		/*wave_ptr[CHAN] += velocity[CHAN];*/	
+		GET_USHORT(wave_ptr[CHAN],0) += velocity[CHAN];
+		if (STATUSbits.C) ++GET_UCHAR(wave_ptr[CHAN],2);
+		/*Has the pointer reached beyond the wave table?*/
+		if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
+			/*Jump back to the start of the loop section, and attenuate further*/ 
+			GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
+			decay[CHAN]++; 									
+		} 														
+		/*Add to the output.*/
+		raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
+		attenuation = decay_table[ decay[CHAN] ];
+		output += (raw_level * attenuation);
+}
+#undef CHAN
