@@ -17,3 +17,4 @@ if (decay[CHAN]) {
 		output += (raw_level * attenuation);
 }
 #undef CHAN
+

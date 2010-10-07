@@ -95,7 +95,10 @@ void isr(void) {
 near unsigned short xptr;
 near signed char out;
 near unsigned char d;
-
+#define TEST1
+#ifdef TEST1
+	#include "tests/test1.h"
+#else
 void main() {
 	init();
 	xptr=0;
@@ -269,3 +272,4 @@ void main() {
 	//Stop
 	stop: while(1);
 }
+#endif

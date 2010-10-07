@@ -19,7 +19,7 @@ filter_lib=*.lib
 filter_lkr=*.lkr
 [CAT_SUBFOLDERS]
 subfolder_src=
-subfolder_inc=
+subfolder_inc=tests
 subfolder_obj=
 subfolder_lib=
 subfolder_lkr=
@@ -29,7 +29,8 @@ file_001=.
 file_002=.
 file_003=.
 file_004=.
-file_005=.
+file_005=tests
+file_006=.
 [GENERATED_FILES]
 file_000=no
 file_001=no
@@ -37,6 +38,7 @@ file_002=no
 file_003=no
 file_004=no
 file_005=no
+file_006=no
 [OTHER_FILES]
 file_000=no
 file_001=no
@@ -44,13 +46,15 @@ file_002=no
 file_003=no
 file_004=no
 file_005=no
+file_006=no
 [FILE_INFO]
 file_000=charlie.c
 file_001=envelopes.h
 file_002=scale.h
 file_003=synth.h
 file_004=score.h
-file_005=C:\Program Files\Microchip\MCC18\bin\LKR\18f1320_g.lkr
+file_005=tests\test1.h
+file_006=C:\Program Files\Microchip\MCC18\bin\LKR\18f1320_g.lkr
 [SUITE_INFO]
 suite_guid={5B7D72DD-9861-47BD-9F60-2BE967BF8416}
 suite_state=
