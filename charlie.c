@@ -1,4 +1,5 @@
 #define USART_DEBUG
+#define TESTFILE "tests/test3.h"
 //----------------------------------------------------------------
 //
 // Charlie
@@ -15,9 +16,7 @@
 #include <pwm.h> 
 #include <timers.h>
 #ifdef USART_DEBUG
-	#include <stdlib.h>
 	#include <usart.h>
-	char obuf[6];
 #endif
 #pragma config WDT=OFF, OSC=HSPLL, MCLRE=OFF
 
@@ -42,6 +41,7 @@
 #define GET_USHORT(arg, offset) *((unsigned short*)((unsigned char*)&arg+offset))
 void init();
 void isr();
+void check_score();
 //----------------------------------------------------------------
 near unsigned short velocity[CHANNEL_COUNT]; 
 near unsigned char decay[CHANNEL_COUNT];
@@ -56,6 +56,7 @@ near unsigned char current_channel;
 near unsigned char delta = 0;
 near unsigned char score_i = 0, note;
 
+near char stop=0;
 //----------------------------------------------------------------
 
 //Initial configuration
@@ -92,60 +93,10 @@ void isr(void) {
 
 }
 
-near unsigned short xptr;
-near signed char out;
-near unsigned char d;
-#define TEST1
-#ifdef TEST1
-	#include "tests/test1.h"
+#ifdef TESTFILE
+	#include TESTFILE
 #else
-void main() {
-	init();
-	xptr=0;
-	d=10;	
-
-/*
-	while(1) {
-		//Wait until the next sample
-		if (INTCONbits.TMR0IF) {
-			//Re-set the timer
-			INTCONbits.TMR0IF = 0; 
-
-			#define CHAN 0
-			if (decay[CHAN]) { 					
-				++GET_USHORT(wave_ptr[CHAN],1);
-				//Has the pointer reached beyond the wave table?
-				if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
-					//Jump back to the start of the loop section, and attenuate further
-					GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
-					decay[CHAN]++; 									
-				} 														
-				//Add to the output.
-				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
-				attenuation = decay_table[ decay[CHAN] ];
-
-				output = (raw_level * attenuation);
-			} else {
-				decay[CHAN]=1;
-				wave_ptr[CHAN]=0;
-			}
-	
-			//out = GET_UCHAR(output,1);
-			itoa(output, obuf);
-			while(BusyUSART());	
-			putsUSART( obuf );
-			putcUSART('\n');
-			//out = 0xff;
-			//putcUSART(out);
-
-			//putcUSART(GET_UCHAR(output,1));
-			//putcUSART(GET_UCHAR(output,0));
-		}
-	}*/
-	
-
-
-	while(1) {
+	void check_score() {
 		//Does another note need to be played?
 		if (PIR1bits.TMR1IF) {
 			//Re-set the timer
@@ -175,8 +126,34 @@ void main() {
 			} while (!delta); 
 			else delta--;
 		}
+	}
+#endif
+
+
+
+void main() {
+	init();
+	#ifdef TEST_INIT
+		test_init();
+	#endif
+
+	while(!stop) {
+		//Do some of the audio channels need updating?
+		check_score();
+
 		
-		//Wait until the next sample
+		//Process the audio channels
+	
+		//Do the existing notes need to be attenuated further?
+		if (PIR1bits.TMR1IF) {
+			PIR1bits.TMR1IF = 0;					//Re-set the timer
+			if (decay[0]) decay[0]++;
+			if (decay[1]) decay[2]++;
+			if (decay[2]) decay[2]++;
+			if (decay[3]) decay[3]++;
+		}
+
+		//Wait for the next sample interval
 		if (INTCONbits.TMR0IF) {
 			//Re-set the timer
 			INTCONbits.TMR0IF = 0; 
@@ -193,7 +170,7 @@ void main() {
 				if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
 					/*Jump back to the start of the loop section, and attenuate further*/ 
 					GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
-					decay[CHAN]++; 									
+					//decay[CHAN]++; 									
 				} 														
 				/*Add to the output.*/
 				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
@@ -210,7 +187,7 @@ void main() {
 				if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
 					/*Jump back to the start of the loop section, and attenuate further*/ 
 					GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
-					decay[CHAN]++; 									
+					//decay[CHAN]++; 									
 				} 														
 				/*Add to the output.*/
 				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
@@ -227,7 +204,7 @@ void main() {
 				if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
 					/*Jump back to the start of the loop section, and attenuate further*/ 
 					GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
-					decay[CHAN]++; 									
+					//decay[CHAN]++; 									
 				} 														
 				/*Add to the output.*/
 				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
@@ -244,7 +221,7 @@ void main() {
 				if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
 					/*Jump back to the start of the loop section, and attenuate further*/ 
 					GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
-					decay[CHAN]++; 									
+					//decay[CHAN]++; 									
 				} 														
 				/*Add to the output.*/
 				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
@@ -253,23 +230,23 @@ void main() {
 			}
 			#undef CHAN
 	
+			//Send the output to the serial port or the PWM dc
 			#ifdef USART_DEBUG
-				itoa(output, obuf);
-				putsUSART( obuf );
-				putcUSART('\n');
-				//putcUSART(GET_UCHAR(output,1));
-				//putcUSART(GET_UCHAR(output,0));
-				
+				while(BusyUSART());
+				putcUSART( (GET_UCHAR(output,1)>>4) + 0x30 );
+				while(BusyUSART());
+				putcUSART( (GET_UCHAR(output,1)&0x0F) + 0x30 );
+				while(BusyUSART());
+				putcUSART( (GET_UCHAR(output,0)>>4) + 0x30 );
+				while(BusyUSART());
+				putcUSART( (GET_UCHAR(output,0)&0x0F) + 0x30 );
 			#else
 				//Update the PWM duty cycle
 				SetDCPWM1(output); 
 			#endif
 		}
-
-
 	}
-
+	
 	//Stop
 	stop: while(1);
 }
-#endif
