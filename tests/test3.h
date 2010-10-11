@@ -1,5 +1,5 @@
 /* ---------------------------------------------------
-   Test 2 : Play increasing notes, by harmonics 
+   Test 3 : Play increasing notes, by chromatics 
    ---------------------------------------------------*/
 #define TEST_INIT
 void test_init();

@@ -1,5 +1,5 @@
 #define USART_DEBUG
-#define TESTFILE "tests/test3.h"
+#define TESTFILE "tests/test6.h"
 //----------------------------------------------------------------
 //
 // Charlie
@@ -41,20 +41,22 @@
 #define GET_USHORT(arg, offset) *((unsigned short*)((unsigned char*)&arg+offset))
 void init();
 void isr();
+void push_note();
 void check_score();
+void attenuate();
 //----------------------------------------------------------------
 near unsigned short velocity[CHANNEL_COUNT]; 
 near unsigned char decay[CHANNEL_COUNT];
 near unsigned short long wave_ptr[CHANNEL_COUNT];
 
 near unsigned char i, attenuation; 
+near signed char raw_level, channel_output;
 near signed short output;
-near signed short raw_level;
 
 near unsigned char current_channel;
 //----------------------------------------------------------------
-near unsigned char delta = 0;
-near unsigned char score_i = 0, note;
+//near unsigned char delta = 0;
+//near unsigned char score_i = 0, note;
 
 near char stop=0;
 //----------------------------------------------------------------
@@ -66,19 +68,18 @@ void init() {
 
 	#ifdef USART_DEBUG
 		OpenUSART( USART_TX_INT_OFF & USART_RX_INT_OFF & USART_ASYNCH_MODE & 
-					USART_EIGHT_BIT & USART_SYNC_MASTER & USART_SINGLE_RX, 25);
+					USART_EIGHT_BIT & USART_SINGLE_RX & USART_BRGH_HIGH, 0x00);
 	#else
 		//Set up PWM
-		//OpenTimer2(TIMER_INT_OFF & T2_PS_1_16 & T2_POST_1_1);
 		OpenPWM1(0xFF); 
 		SetOutputPWM1(SINGLE_OUT, PWM_MODE_1);
 	#endif
 
 	//Set up sampling timer
-	OpenTimer0(	TIMER_INT_OFF & T0_8BIT & T0_SOURCE_INT & T0_PS_1_1 );
+	OpenTimer0(	TIMER_INT_OFF & T0_8BIT & T0_SOURCE_INT & T0_PS_1_2 );
 
-	//Set up scoring timer
-	OpenTimer1( TIMER_INT_OFF & T1_8BIT_RW & T1_SOURCE_INT & T1_PS_1_8);
+	//Set up scoring/decay timer
+	OpenTimer1( TIMER_INT_OFF & T1_8BIT_RW & T1_SOURCE_INT & T1_PS_1_1);
 
 	//Enable interrupts
 	//INTCONbits.GIEH=1;
@@ -111,13 +112,7 @@ void isr(void) {
 				if (!note) goto stop;
 
 				// Push that note into a channel
-				velocity[current_channel] = W_table[ note ];
-				decay[current_channel]=1;
-				wave_ptr[current_channel] = 0;
-				
-				// Shift to the next channel
-				if (++current_channel==CHANNEL_COUNT) 
-					current_channel = 0;
+				push_note();
 				
 				// Set the delay to the next note
 				delta = score_delta[ score_i ];
@@ -130,27 +125,52 @@ void isr(void) {
 #endif
 
 
+/**
+ * Add a new note to the channels - overwrites the oldest note there.
+ */
+void push_note() {
+	// Push that note into a channel
+	velocity[current_channel] = W_table[ note.v ];
+	decay[current_channel]=1;
+	wave_ptr[current_channel] = 0;
+	
+	// Shift to the next channel
+	if (++current_channel==CHANNEL_COUNT) 
+		current_channel = 0;
+}
 
+void attenuate() { //mul_8s_8u_geth() {
+	_asm
+		movf attenuation, 0, ACCESS
+		mulwf raw_level, ACCESS
+		btfsc raw_level,7, ACCESS
+		subwf PRODH,1, ACCESS
+		movff PRODH, channel_output
+	_endasm
+}
 void main() {
 	init();
+
 	#ifdef TEST_INIT
 		test_init();
 	#endif
 
-	while(!stop) {
-		//Do some of the audio channels need updating?
-		check_score();
 
-		
-		//Process the audio channels
-	
-		//Do the existing notes need to be attenuated further?
+	//Process the audio channels
+	while(1) {
+		//Wait for the next attenuation / score interval		
 		if (PIR1bits.TMR1IF) {
 			PIR1bits.TMR1IF = 0;					//Re-set the timer
+			//TMR1H |= 0x80;						//Halve the timer duration.
+
+			//Do the existing notes need to be attenuated?
 			if (decay[0]) decay[0]++;
-			if (decay[1]) decay[2]++;
+			if (decay[1]) decay[1]++;
 			if (decay[2]) decay[2]++;
 			if (decay[3]) decay[3]++;
+
+			//Do new notes need to be played?
+			check_score();
 		}
 
 		//Wait for the next sample interval
@@ -175,7 +195,8 @@ void main() {
 				/*Add to the output.*/
 				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
 				attenuation = decay_table[ decay[CHAN] ];
-				output += (raw_level * attenuation)/256;
+				attenuate();
+				output += channel_output;
 			}
 			#undef CHAN
 			#define CHAN 1
@@ -192,7 +213,8 @@ void main() {
 				/*Add to the output.*/
 				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
 				attenuation = decay_table[ decay[CHAN] ];
-				output += (raw_level * attenuation)/256;
+				attenuate();
+				output += channel_output;
 			}
 			#undef CHAN
 			#define CHAN 2
@@ -209,7 +231,8 @@ void main() {
 				/*Add to the output.*/
 				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
 				attenuation = decay_table[ decay[CHAN] ];
-				output += (raw_level * attenuation)/256;
+				attenuate();
+				output += channel_output;
 			}
 			#undef CHAN
 			#define CHAN 3
@@ -226,12 +249,15 @@ void main() {
 				/*Add to the output.*/
 				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
 				attenuation = decay_table[ decay[CHAN] ];
-				output += (raw_level * attenuation)/256;
+				attenuate();
+				output += channel_output;
 			}
 			#undef CHAN
-	
+
 			//Send the output to the serial port or the PWM dc
 			#ifdef USART_DEBUG
+				//Output only 8-bit data
+				//output = output>>2;
 				while(BusyUSART());
 				putcUSART( (GET_UCHAR(output,1)>>4) + 0x30 );
 				while(BusyUSART());
@@ -245,6 +271,13 @@ void main() {
 				SetDCPWM1(output); 
 			#endif
 		}
+		
+		if (stop 
+		&& !decay[0] 
+		&& !decay[1] 
+		&& !decay[2] 
+		&& !decay[3])
+			goto stop;	
 	}
 	
 	//Stop
