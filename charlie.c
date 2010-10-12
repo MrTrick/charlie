@@ -1,5 +1,5 @@
 #define USART_DEBUG
-#define TESTFILE "tests/test1.h"
+//#define TESTFILE "tests/test1.h"
 //----------------------------------------------------------------
 //
 // Charlie
@@ -33,7 +33,6 @@
 //----------------------------------------------------------------
 #include "envelopes.h"
 #include "scale.h"
-
 //----------------------------------------------------------------
 //Macros and function prototypes
 #define GET_UCHAR(arg, offset) *((unsigned char*)&arg+offset)
@@ -105,9 +104,19 @@ void isr(void) {
 	#include TESTFILE
 #else
 	#include "score.h"
+	void score_init(void);
+
+	void score_init() {
+		note.i = 0;
+		delta.i = 38;
+	}
+
+	near unsigned char x=5;
 
 	//Called periodically, plays new notes at the right time.
 	void check_score() {
+		if (--x) return;
+		x=5;
 		//Is it time for the next note?
 		if (!delta.v) do {
 			// Get the next note. If no more notes, end the song.
@@ -179,9 +188,12 @@ void attenuate() { //mul_8s_8u_geth() {
 }
 void main() {
 	init();
-
+	
 	#ifdef TEST_INIT
 		test_init();
+	#endif
+	#ifndef TESTFILE
+		score_init();
 	#endif
 
 

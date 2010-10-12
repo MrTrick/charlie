@@ -3,7 +3,7 @@
 rom near unsigned char score_note[] = {
 	F4, F2, A2, C3, F3, G4, A4, G4, F4, E4, D4, //1
 
-	E4, F2, A2, C3, F4, F4, G4, F4, E4, D4, C4, //1
+	E4, F2, A2, C3, F3, F4, G4, F4, E4, D4, C4, //1
 
 	D4, C4,	A2, E4, F4, //2
 	
@@ -22,16 +22,29 @@ rom near unsigned char score_note[] = {
 	G4, G2, As2, D3, G3, D4, //4
 	
 	A4, C3, E3, G3, As3, G4, //4
+	RET
 };
+
+rom near unsigned char score_delta[] = {
+	0, 10, 10, 10, 10, 20, 20, 20, 20, 20, 20, RET, //1 : 0
+	0, 0, 40, 20, 20, RET, //2 : 12
+	0, 10, 10, 10, 10, 20, 20, 0, 20, 20, 20, 20, RET, //3 : 18
+	0, 10, 10, 10, 30, 20, RET, //4 : 31
+	CALL|0, CALL|0, 
+	CALL|12, CALL|12, CALL|12, CALL|12,
+	CALL|0, CALL|18, 
+	CALL|18, CALL|31, CALL|31, RET
+};
+
 
 /*rom near unsigned char score_note[] = {
 	C2, D2, E2, F2, G2, A2, B2, C3,
 	C3, B2, A2, G2, F2, E2, D2, C2, E2, G2,
 	0x00
 };*/
-
+/*
 rom near unsigned char score_delta[] = {
 	32, 16, 16, 16, 16, 16, 16, 32,
 	32, 16, 16, 16, 16, 16, 16, 0,0,64 //chord
 };
-
+*/

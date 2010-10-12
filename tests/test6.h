@@ -5,11 +5,6 @@
 #define TEST_INIT
 void test_init(void);
 
-void test_init() {
-	note.i = 36; //set start points
-	delta.i = 18;
-}
-
 rom near unsigned char score_note[] = {
 	F3, C4,	F3, C4, F3, C4,	D3, F3, C4,	F3, C4,	D3, F3, C4,	D3, F3, C4,	RET,//18
 	E3, B3, E3, B3, E3, B3, C3, E3, B3, E3, B3, C3, E3, B3, C3, E3, B3, RET,//18
@@ -20,6 +15,12 @@ rom near unsigned char score_delta[] = {
 	0, 0x20, 0, 0x20, 0, 0x20, 0x10, 0, 0x20, 0, 0x20, 0x10, 0, 0x10, 0x10, 0, 0x20, RET, //18
 	CALL, CALL, CALL, CALL, CALL, CALL, CALL, CALL, RET,
 };
+
+
+void test_init() {
+	note.i = 36; //set start points
+	delta.i = 18;
+}
 
 void check_score() {
 	//Is it time for the next note?
