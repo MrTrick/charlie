@@ -1,5 +1,5 @@
 #define USART_DEBUG
-#define TESTFILE "tests/test6.h"
+#define TESTFILE "tests/test1.h"
 //----------------------------------------------------------------
 //
 // Charlie
@@ -33,17 +33,18 @@
 //----------------------------------------------------------------
 #include "envelopes.h"
 #include "scale.h"
-#include "score.h"
 
 //----------------------------------------------------------------
 //Macros and function prototypes
 #define GET_UCHAR(arg, offset) *((unsigned char*)&arg+offset)
 #define GET_USHORT(arg, offset) *((unsigned short*)((unsigned char*)&arg+offset))
-void init();
-void isr();
-void push_note();
-void check_score();
-void attenuate();
+void init(void);
+void isr(void);
+void check_score(void);
+void note_next(void);
+void delta_next(void);
+void push_note(void);
+void attenuate(void);
 //----------------------------------------------------------------
 near unsigned short velocity[CHANNEL_COUNT]; 
 near unsigned char decay[CHANNEL_COUNT];
@@ -55,8 +56,10 @@ near signed short output;
 
 near unsigned char current_channel;
 //----------------------------------------------------------------
-//near unsigned char delta = 0;
-//near unsigned char score_i = 0, note;
+struct {
+	near unsigned char v, i, d;
+	near unsigned char stack[2];	
+} note = {0,0,0}, delta = {0,0,0};
 
 near char stop=0;
 //----------------------------------------------------------------
@@ -86,48 +89,41 @@ void init() {
 }
 
 //----------------------------------------------------------------
-//Interrupt handler
+// Interrupt handler
 #pragma code low_vector=0x08
 void int_vector (void) { _asm GOTO isr _endasm }
 #pragma interrupt isr 
 void isr(void) {
 
 }
+//----------------------------------------------------------------
+// Scoring functions
+#define CALL 0x80 //In the score - to call a sub-section
+#define RET 0xFF //In the score - to return from a sub-section or to end the song.
 
 #ifdef TESTFILE
 	#include TESTFILE
 #else
+	#include "score.h"
+
+	//Called periodically, plays new notes at the right time.
 	void check_score() {
-		//Does another note need to be played?
-		if (PIR1bits.TMR1IF) {
-			//Re-set the timer
-			PIR1bits.TMR1IF = 0;
-			if (--d) continue;
-			d=10;
-			
-			//Is it time for the next note?
-			if (!delta) do {
-				// Get the next note. If no more notes, end the song.
-				note = score_note[ score_i ];
-				if (!note) goto stop;
-
-				// Push that note into a channel
-				push_note();
-				
-				// Set the delay to the next note
-				delta = score_delta[ score_i ];
-
-				score_i++;
-			} while (!delta); 
-			else delta--;
-		}
-	}
+		//Is it time for the next note?
+		if (!delta.v) do {
+			// Get the next note. If no more notes, end the song.
+			note_next();
+			delta_next();
+			if (stop) return;
+	
+			// Push that note into a channel
+			push_note();
+		} while (!delta.v); 
+		else delta.v--;
+	}	
 #endif
 
 
-/**
- * Add a new note to the channels - overwrites the oldest note there.
- */
+// Add a new note to the channels - overwrite the oldest note there.
 void push_note() {
 	// Push that note into a channel
 	velocity[current_channel] = W_table[ note.v ];
@@ -139,6 +135,39 @@ void push_note() {
 		current_channel = 0;
 }
 
+//Fetch the next note out of the notes table
+//(table is compressed using sub-melodies)
+void note_next(void) {
+	do {
+		note.v = score_note[ note.i++ ];		// Get the next element
+		if (note.v == RET) { 					// Returning from a subsection?
+			if (!note.d) { stop=1; return; }
+			note.i = note.stack[--note.d];
+		} else if (note.v&CALL) { 				// Going into a sub-section?
+			note.stack[note.d++] = note.i;
+			note.i = note.v&~CALL;
+		} else return;						// Neither, this is the desired element
+	} while (1);
+}
+
+//Fetch the next delta out of the delta table
+//(table is compressed using sub-rhythms)
+void delta_next(void) {
+	do {
+		delta.v = score_delta[ delta.i++ ];		// Get the next element
+		if (delta.v == RET) { 					// Returning from a subsection?
+			if (!delta.d) { stop=1; return; }
+			delta.i = delta.stack[--delta.d];
+		} else if (delta.v&CALL) { 				// Going into a sub-section?
+			delta.stack[delta.d++] = delta.i;
+			delta.i = delta.v&~CALL;
+		} else return;						// Neither, this is the desired element
+	} while (1);
+}
+//----------------------------------------------------------------
+// Synthesis Functions
+
+//Reduce the raw table lookup by a given attenuation amount
 void attenuate() { //mul_8s_8u_geth() {
 	_asm
 		movf attenuation, 0, ACCESS
@@ -272,11 +301,8 @@ void main() {
 			#endif
 		}
 		
-		if (stop 
-		&& !decay[0] 
-		&& !decay[1] 
-		&& !decay[2] 
-		&& !decay[3])
+		//Has the melody finished playing?
+		if (stop && !decay[0] && !decay[1] && !decay[2] && !decay[3])
 			goto stop;	
 	}
 	

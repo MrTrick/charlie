@@ -8,6 +8,9 @@ void test_init() {
 	velocity[0]=0x0;
 }
 
+rom near unsigned char score_note[]; //not used
+rom near unsigned char score_delta[]; //not used
+
 void check_score() {
 	//Wait until the previous note has faded - then start a new one.
 	if (!decay[0]) {

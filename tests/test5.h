@@ -1,13 +1,10 @@
 /* ---------------------------------------------------
    Test 5 : Play some simple chords 
    ---------------------------------------------------*/
-#define TEST_INIT
-void test_init();
-void test_init() {
-	i=3;
-}
+near unsigned char score_i=0;
+near unsigned char repeat=2;
 
-rom near unsigned char chord_note[] = {
+rom near unsigned char score_note[] = {
 	C4, 
 	C4, E4, 
 	C4, E4, G4, 
@@ -19,7 +16,7 @@ rom near unsigned char chord_note[] = {
 	0x00
 };
 
-rom near unsigned char chord_delta[] = {
+rom near unsigned char score_delta[] = {
 	0x80, 
 	0, 0x80, 
 	0, 0, 0x80, 
@@ -32,22 +29,22 @@ rom near unsigned char chord_delta[] = {
 
 void check_score() {
 	//Is it time for the next note?
-	if (!delta) do {
+	if (!delta.v) do {
 		// Get the next note. If no more notes, end the song.
-		note = chord_note[ score_i ];
+		note.v = score_note[ score_i ];
 
 		// Push that note into a channel
-		if (note) {
+		if (note.v) {
 			push_note();
 			// Set the delay until the next note
-			delta = chord_delta[ score_i ];
+			delta.v = score_delta[ score_i ];
 			score_i++;
 		} else {
-	 		if (!--i) stop=1;
+	 		if (!--repeat) stop=1;
 			score_i=0;
 		}
-	} while (!delta); 
-	else delta--;
+	} while (!delta.v); 
+	else delta.v--;
 }	
 	
 
