@@ -12,9 +12,11 @@
 // Runs at 40MHz - needs a 10Mhz crystal, and is multiplied internally.
 //
 //----------------------------------------------------------------
+
 #include <p18f1320.h>
 #include <pwm.h> 
 #include <timers.h>
+#include <delays.h>
 #ifdef USART_DEBUG
 	#include <usart.h>
 #endif
@@ -30,44 +32,63 @@
 #define P_COUNT 128
 //How many simultaneous notes can there be?
 #define CHANNEL_COUNT 4
+//What is the ratio between decay and note tempo
+#define TEMPO_SCALING 5
 //----------------------------------------------------------------
 #include "envelopes.h"
 #include "scale.h"
 //----------------------------------------------------------------
-//Macros and function prototypes
 #define GET_UCHAR(arg, offset) *((unsigned char*)&arg+offset)
 #define GET_USHORT(arg, offset) *((unsigned short*)((unsigned char*)&arg+offset))
+
+
 void init(void);
 void isr(void);
+void play_song(void);
+
+//----------------------------------------------------------------
+// Scoring vars and prototypes
+
+void score_init(void);
 void check_score(void);
 void note_next(void);
 void delta_next(void);
 void push_note(void);
-void attenuate(void);
-//----------------------------------------------------------------
-near unsigned short velocity[CHANNEL_COUNT]; 
-near unsigned char decay[CHANNEL_COUNT];
-near unsigned short long wave_ptr[CHANNEL_COUNT];
 
-near unsigned char i, attenuation; 
-near signed char raw_level, channel_output;
-near signed short output;
-
-near unsigned char current_channel;
-//----------------------------------------------------------------
 struct {
 	near unsigned char v, i, d;
 	near unsigned char stack[2];	
 } note = {0,0,0}, delta = {0,0,0};
 
-near char stop=0;
+near unsigned char tempo_scaling=0;
+near unsigned char stop=0, finished=0;
+
 //----------------------------------------------------------------
+// Synthesis vars and prototypes
 
+void attenuate(void);
+
+near unsigned short velocity[CHANNEL_COUNT]; 
+near unsigned char decay[CHANNEL_COUNT];
+near unsigned short long wave_ptr[CHANNEL_COUNT];
+
+near unsigned char attenuation; 
+near signed char raw_level, channel_output;
+near signed short output;
+
+near unsigned char current_channel;
+
+//----------------------------------------------------------------
+// IO vars
+#define AUDIO_DISABLE 2
+#define BUTTON 7
+#define button PORTBbits.RB7
+#define audio_disable TRISBbits.TRISB2
+
+//----------------------------------------------------------------
 //Initial configuration
-void init() {
-	//Empty the channels
-	for(i=0;i<CHANNEL_COUNT;i++) decay[i] = 0;
 
+void init() {
 	#ifdef USART_DEBUG
 		OpenUSART( USART_TX_INT_OFF & USART_RX_INT_OFF & USART_ASYNCH_MODE & 
 					USART_EIGHT_BIT & USART_SINGLE_RX & USART_BRGH_HIGH, 0x00);
@@ -83,18 +104,61 @@ void init() {
 	//Set up scoring/decay timer
 	OpenTimer1( TIMER_INT_OFF & T1_8BIT_RW & T1_SOURCE_INT & T1_PS_1_1);
 
-	//Enable interrupts
-	//INTCONbits.GIEH=1;
+	//Configure the IO pins
+	ADCON1 = 0xFF;				//Disable the analog pins
+	INTCON2bits.NOT_RBPU = 0;	//Allow weak pull-ups
+	INTCONbits.RBIE = 1; 		//Enable interrupt-on-change for RB4:7
+	
+	TRISB |= 1<<BUTTON;			//Ensure 'button' is an input.
+	PORTB &= ~(1<<AUDIO_DISABLE);//And that 'audio_disable' will toggle a pnp, 
+	audio_disable = 1;			//and that the amplifier is initially off.
 }
+
+
+
 
 //----------------------------------------------------------------
 // Interrupt handler
-#pragma code low_vector=0x08
+#pragma code int_vector=0x08
 void int_vector (void) { _asm GOTO isr _endasm }
 #pragma interrupt isr 
 void isr(void) {
-
+	//
 }
+
+//----------------------------------------------------------------
+// Program entry
+void main() {
+	init();
+	
+	while (1) {
+		//Wait for a button click
+		while (button) {
+			INTCONbits.RBIF = 0; //Clear the pin change flag
+			Sleep();			//Sleep until something happens
+			Delay10KTCYx(50); //Wait, so that bounces can be ignored
+		} 
+		while(!button); //Wait for the button to be released
+		Delay10KTCYx(50);
+
+		//Initialise
+		#ifdef TEST_INIT
+			test_init();
+		#endif
+		#ifndef TESTFILE
+			score_init();
+		#endif
+	
+		//Play the song in its entirety, unless the 
+		play_song();
+
+		//Make sure the button is released 
+		Delay10KTCYx(50);
+		while(!button); 
+		Delay10KTCYx(50);
+	}
+}
+
 //----------------------------------------------------------------
 // Scoring functions
 #define CALL 0x80 //In the score - to call a sub-section
@@ -104,31 +168,34 @@ void isr(void) {
 	#include TESTFILE
 #else
 	#include "score.h"
-	void score_init(void);
+void score_init(void);
 
-	void score_init() {
-		note.i = NOTE_START;
-		delta.i = DELTA_START;
-	}
+//Reset the score back to the start of the song
+void score_init() {
+	note.i = NOTE_START;
+	delta.i = DELTA_START;
 
-	near unsigned char x=5;
+	//Empty the channels
+	decay[0] = 0;
+	decay[1] = 0;
+	decay[2] = 0;
+	decay[3] = 0;
+}
 
-	//Called periodically, plays new notes at the right time.
-	void check_score() {
-		if (--x) return;
-		x=5;
-		//Is it time for the next note?
-		if (!delta.v) do {
-			// Get the next note. If no more notes, end the song.
-			note_next();
-			delta_next();
-			if (stop) return;
-	
-			// Push that note into a channel
-			push_note();
-		} while (!delta.v); 
-		else delta.v--;
-	}	
+//Called periodically, plays new notes at the right time.
+void check_score() {
+	//Is it time for the next note?
+	if (!delta.v) do {
+		// Get the next note. If no more notes, end the song.
+		note_next();
+		delta_next();
+		if (finished) return;
+
+		// Push that note into a channel
+		push_note();
+	} while (!delta.v); 
+	else delta.v--;
+}	
 #endif
 
 
@@ -150,7 +217,7 @@ void note_next(void) {
 	do {
 		note.v = score_note[ note.i++ ];		// Get the next element
 		if (note.v == RET) { 					// Returning from a subsection?
-			if (!note.d) { stop=1; return; }
+			if (!note.d) { finished=1; return; }
 			note.i = note.stack[--note.d];
 		} else if (note.v&CALL) { 				// Going into a sub-section?
 			note.stack[note.d++] = note.i;
@@ -165,7 +232,7 @@ void delta_next(void) {
 	do {
 		delta.v = score_delta[ delta.i++ ];		// Get the next element
 		if (delta.v == RET) { 					// Returning from a subsection?
-			if (!delta.d) { stop=1; return; }
+			if (!delta.d) { finished=1; return; }
 			delta.i = delta.stack[--delta.d];
 		} else if (delta.v&CALL) { 				// Going into a sub-section?
 			delta.stack[delta.d++] = delta.i;
@@ -186,19 +253,38 @@ void attenuate() { //mul_8s_8u_geth() {
 		movff PRODH, channel_output
 	_endasm
 }
-void main() {
-	init();
-	
-	#ifdef TEST_INIT
-		test_init();
-	#endif
-	#ifndef TESTFILE
-		score_init();
-	#endif
 
+//Calculate the waveform for a single channel.
+//(macro, because C18 doesn't have inline functions)
+#define PROCESS_CHANNEL(CHAN) if (decay[CHAN]) { 								\
+	/*wave_ptr[CHAN] += velocity[CHAN];*/										\
+	GET_USHORT(wave_ptr[CHAN],0) += velocity[CHAN];								\
+	if (STATUSbits.C) ++GET_UCHAR(wave_ptr[CHAN],2);							\
+	/*Has the pointer reached beyond the wave table?*/							\
+	if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK)						\
+		/*Jump back to the start of the loop section, and attenuate further*/ 	\
+		GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 								\
+	/*Add to the output.*/														\
+	raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];						\
+	attenuation = decay_table[ decay[CHAN] ];									\
+	attenuate();																\
+	output += channel_output;													\
+}
 
-	//Process the audio channels
-	while(1) {
+//Play through the score, and output the appropriate 
+//waveforms, until stopped or finished.
+void play_song() {
+	//Enable the amplifier
+	audio_disable = 0;
+
+	while(!stop) {
+		//Is the button pressed?
+		if (!button) break;
+
+		//Has the melody finished playing?
+		if (finished && !decay[0] && !decay[1] && !decay[2] && !decay[3])
+			break;	
+
 		//Wait for the next attenuation / score interval		
 		if (PIR1bits.TMR1IF) {
 			PIR1bits.TMR1IF = 0;					//Re-set the timer
@@ -211,7 +297,10 @@ void main() {
 			if (decay[3]) decay[3]++;
 
 			//Do new notes need to be played?
-			check_score();
+			if (!--tempo_scaling) {
+				tempo_scaling = TEMPO_SCALING;
+				check_score();
+			}
 		}
 
 		//Wait for the next sample interval
@@ -221,79 +310,11 @@ void main() {
 			TMR0L += 0x100-SAMPLING_TMR_COUNT;
 	
 			output = 0;
-			//Process the audio channels (four of them)
-			#define CHAN 0
-			if (decay[CHAN]) { 					
-				/*wave_ptr[CHAN] += velocity[CHAN];*/	
-				GET_USHORT(wave_ptr[CHAN],0) += velocity[CHAN];
-				if (STATUSbits.C) ++GET_UCHAR(wave_ptr[CHAN],2);
-				/*Has the pointer reached beyond the wave table?*/
-				if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
-					/*Jump back to the start of the loop section, and attenuate further*/ 
-					GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
-					//decay[CHAN]++; 									
-				} 														
-				/*Add to the output.*/
-				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
-				attenuation = decay_table[ decay[CHAN] ];
-				attenuate();
-				output += channel_output;
-			}
-			#undef CHAN
-			#define CHAN 1
-			if (decay[CHAN]) { 					
-				/*wave_ptr[CHAN] += velocity[CHAN];*/	
-				GET_USHORT(wave_ptr[CHAN],0) += velocity[CHAN];
-				if (STATUSbits.C) ++GET_UCHAR(wave_ptr[CHAN],2);
-				/*Has the pointer reached beyond the wave table?*/
-				if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
-					/*Jump back to the start of the loop section, and attenuate further*/ 
-					GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
-					//decay[CHAN]++; 									
-				} 														
-				/*Add to the output.*/
-				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
-				attenuation = decay_table[ decay[CHAN] ];
-				attenuate();
-				output += channel_output;
-			}
-			#undef CHAN
-			#define CHAN 2
-			if (decay[CHAN]) { 					
-				/*wave_ptr[CHAN] += velocity[CHAN];*/	
-				GET_USHORT(wave_ptr[CHAN],0) += velocity[CHAN];
-				if (STATUSbits.C) ++GET_UCHAR(wave_ptr[CHAN],2);
-				/*Has the pointer reached beyond the wave table?*/
-				if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
-					/*Jump back to the start of the loop section, and attenuate further*/ 
-					GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
-					//decay[CHAN]++; 									
-				} 														
-				/*Add to the output.*/
-				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
-				attenuation = decay_table[ decay[CHAN] ];
-				attenuate();
-				output += channel_output;
-			}
-			#undef CHAN
-			#define CHAN 3
-			if (decay[CHAN]) { 					
-				/*wave_ptr[CHAN] += velocity[CHAN];*/	
-				GET_USHORT(wave_ptr[CHAN],0) += velocity[CHAN];
-				if (STATUSbits.C) ++GET_UCHAR(wave_ptr[CHAN],2);
-				/*Has the pointer reached beyond the wave table?*/
-				if (GET_UCHAR(wave_ptr[CHAN],2) & WAVE_OVERFLOW_MASK) {
-					/*Jump back to the start of the loop section, and attenuate further*/ 
-					GET_USHORT(wave_ptr[CHAN],1) -= LOOP_SIZE; 		
-					//decay[CHAN]++; 									
-				} 														
-				/*Add to the output.*/
-				raw_level = wave_table[ GET_USHORT(wave_ptr[CHAN],1) ];
-				attenuation = decay_table[ decay[CHAN] ];
-				attenuate();
-				output += channel_output;
-			}
-			#undef CHAN
+			//Process the audio channels
+			PROCESS_CHANNEL(0)
+			PROCESS_CHANNEL(1)
+			PROCESS_CHANNEL(2)
+			PROCESS_CHANNEL(3)
 
 			//Send the output to the serial port or the PWM dc
 			#ifdef USART_DEBUG
@@ -312,12 +333,9 @@ void main() {
 				SetDCPWM1(output); 
 			#endif
 		}
-		
-		//Has the melody finished playing?
-		if (stop && !decay[0] && !decay[1] && !decay[2] && !decay[3])
-			goto stop;	
 	}
 	
-	//Stop
-	stop: while(1);
-}
+	//Disable the amplifier
+	audio_disable = 1;
+}		
+	

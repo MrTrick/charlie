@@ -25,15 +25,22 @@ rom near unsigned char score_note[] = {
 };
 #define NOTE_START 106
 
+#define Tempo 10
+#define Qu 1*Tempo	//Quaver
+#define Cr 2*Tempo	//Crotchet
+#define dC 3*Tempo	//Dotted Crotchet
+#define Mi 4*Tempo	//Minim
+#define ch 0 		//chord-part (no delay)
+//(These deltas cannot be higher than 0x79)
 
 rom near unsigned char score_delta[] = {
 	//Rhythms:
-	0, 10, 10, 10, 10, 10, 10, 20, 10, 10, 20, RET, //1 : 0
-	0, 0, 40, 10, 10, RET, //2 : 12
-	0, 10, 10, 10, 10, 10, 10, 0, 20, 10, 10, 20, RET, //3 : 18
-	0, 10, 10, 10, 20, 10, RET, //4 : 31
-	0, 10, 10, 10, 0, 30, RET, //5 : 38
-	0, 10, 10, 10, 10, 10, 10, 10, RET, //6 : 45
+	ch, Qu, Qu, Qu,  Qu, Qu, Qu, Cr,  Qu, Qu, Cr, RET, 		//1 : 0
+	ch, ch, Mi, Qu,  Qu, RET, 								//2 : 12
+	ch, Qu, Qu, Qu,  Qu, Qu, Qu, ch,  Cr, Qu, Qu, Cr,  RET,	//3 : 18
+	ch, Qu, Qu, Qu,  Cr, Qu, RET, 	 						//4 : 31
+	ch, Qu, Qu, Qu,  ch, dC, RET, 							//5 : 38
+	ch, Qu, Qu, Qu,  Qu, Qu, Qu, Qu,  RET, 					//6 : 45
 
 	//Verse main : 54
 	CALL|0, CALL|0, 
@@ -46,15 +53,3 @@ rom near unsigned char score_delta[] = {
 };
 #define DELTA_START 65
 
-
-/*rom near unsigned char score_note[] = {
-	C2, D2, E2, F2, G2, A2, B2, C3,
-	C3, B2, A2, G2, F2, E2, D2, C2, E2, G2,
-	0x00
-};*/
-/*
-rom near unsigned char score_delta[] = {
-	32, 16, 16, 16, 16, 16, 16, 32,
-	32, 16, 16, 16, 16, 16, 16, 0,0,64 //chord
-};
-*/
