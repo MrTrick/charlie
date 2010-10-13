@@ -107,8 +107,8 @@ void isr(void) {
 	void score_init(void);
 
 	void score_init() {
-		note.i = 0;
-		delta.i = 38;
+		note.i = NOTE_START;
+		delta.i = DELTA_START;
 	}
 
 	near unsigned char x=5;
