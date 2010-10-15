@@ -178,8 +178,11 @@ void score_init(void);
 
 //Reset the score back to the start of the song
 void score_init() {
+	//Initialise the score pointers
 	note.i = NOTE_START;
+	note.d = 0;
 	delta.i = DELTA_START;
+	delta.d = 0;
 
 	//Empty the channels
 	decay[0] = 0;
