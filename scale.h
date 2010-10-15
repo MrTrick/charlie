@@ -15,7 +15,7 @@
 // The waveform is advanced only by the upper 'whole' byte.
 
 // The macro calcW calculates how fast the table pointer moves, and stores in a [whole|fractional] word.
-#define UPSCALE 4.0 //Make the notes higher so the little speaker can play them better
+#define UPSCALE 8.0 //Make the notes higher so the little speaker can play them better
 #define calcW(F) (short)( (F)*UPSCALE*256.0*(float)P_COUNT/(float)SAMPLING_FREQ + 0.5 )
 #define NOTES_COUNT 72
 rom near unsigned short W_table[NOTES_COUNT] = {

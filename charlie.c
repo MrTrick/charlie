@@ -1,5 +1,6 @@
-#define USART_DEBUG
-//#define TESTFILE "tests/test1.h"
+//#define DEBUG_WITH_USART
+//#define DEBUG_WITHOUT_BUTTONS
+//#define TESTFILE "tests/test2.h"
 //----------------------------------------------------------------
 //
 // Charlie
@@ -17,10 +18,13 @@
 #include <pwm.h> 
 #include <timers.h>
 #include <delays.h>
-#ifdef USART_DEBUG
+#ifdef DEBUG_WITH_USART
 	#include <usart.h>
 #endif
-#pragma config WDT=OFF, OSC=HSPLL, MCLRE=OFF
+#pragma config OSC=HSPLL, FSCM=OFF, IESO=OFF
+#pragma config BOR=OFF, PWRT=ON, WDT=OFF, MCLRE=OFF
+#pragma config DEBUG=ON, LVP=OFF, STVR=OFF
+				
 
 //Processor speed - controlled by config, and mabye osccon
 #define PROC_SPEED 40000000 	
@@ -63,6 +67,9 @@ struct {
 near unsigned char tempo_scaling=0;
 near unsigned char stop=0, finished=0;
 
+#define CALL 0x80 //In the score - to call a sub-section
+#define RET 0xFF //In the score - to return from a sub-section or to end the song.
+
 //----------------------------------------------------------------
 // Synthesis vars and prototypes
 
@@ -80,16 +87,18 @@ near unsigned char current_channel;
 
 //----------------------------------------------------------------
 // IO vars
-#define AUDIO_DISABLE 2
-#define BUTTON 7
-#define button PORTBbits.RB7
-#define audio_disable TRISBbits.TRISB2
-
+#define button PORTBbits.RB5
+//----------------------------------------------------------------
+#ifdef TESTFILE
+	#include TESTFILE
+#else
+	#include "score.h"
+#endif
 //----------------------------------------------------------------
 //Initial configuration
 
 void init() {
-	#ifdef USART_DEBUG
+	#ifdef DEBUG_WITH_USART
 		OpenUSART( USART_TX_INT_OFF & USART_RX_INT_OFF & USART_ASYNCH_MODE & 
 					USART_EIGHT_BIT & USART_SINGLE_RX & USART_BRGH_HIGH, 0x00);
 	#else
@@ -108,10 +117,6 @@ void init() {
 	ADCON1 = 0xFF;				//Disable the analog pins
 	INTCON2bits.NOT_RBPU = 0;	//Allow weak pull-ups
 	INTCONbits.RBIE = 1; 		//Enable interrupt-on-change for RB4:7
-	
-	TRISB |= 1<<BUTTON;			//Ensure 'button' is an input.
-	PORTB &= ~(1<<AUDIO_DISABLE);//And that 'audio_disable' will toggle a pnp, 
-	audio_disable = 1;			//and that the amplifier is initially off.
 }
 
 
@@ -132,14 +137,16 @@ void main() {
 	init();
 	
 	while (1) {
-		//Wait for a button click
-		while (button) {
-			INTCONbits.RBIF = 0; //Clear the pin change flag
-			Sleep();			//Sleep until something happens
-			Delay10KTCYx(50); //Wait, so that bounces can be ignored
-		} 
-		while(!button); //Wait for the button to be released
-		Delay10KTCYx(50);
+		#ifndef DEBUG_WITHOUT_BUTTONS
+			//Wait for a button click
+			while (button) {
+				INTCONbits.RBIF = 0; //Clear the pin change flag
+				Sleep();			//Sleep until something happens
+				Delay10KTCYx(50); //Wait, so that bounces can be ignored
+			} 
+			while(!button); //Wait for the button to be released
+			Delay10KTCYx(50);
+		#endif
 
 		//Initialise
 		#ifdef TEST_INIT
@@ -152,22 +159,21 @@ void main() {
 		//Play the song in its entirety, unless the 
 		play_song();
 
-		//Make sure the button is released 
-		Delay10KTCYx(50);
-		while(!button); 
-		Delay10KTCYx(50);
+		#ifndef DEBUG_WITHOUT_BUTTONS
+			//Make sure the button is released 
+			Delay10KTCYx(50);
+			while(!button); 
+			Delay10KTCYx(50);
+		#else
+			break;
+		#endif
 	}
+	stop: while(1);
 }
 
 //----------------------------------------------------------------
 // Scoring functions
-#define CALL 0x80 //In the score - to call a sub-section
-#define RET 0xFF //In the score - to return from a sub-section or to end the song.
-
-#ifdef TESTFILE
-	#include TESTFILE
-#else
-	#include "score.h"
+#ifndef TESTFILE
 void score_init(void);
 
 //Reset the score back to the start of the song
@@ -180,6 +186,9 @@ void score_init() {
 	decay[1] = 0;
 	decay[2] = 0;
 	decay[3] = 0;
+
+	//Prep the first note to play immediately
+	tempo_scaling = 1;
 }
 
 //Called periodically, plays new notes at the right time.
@@ -274,12 +283,14 @@ void attenuate() { //mul_8s_8u_geth() {
 //Play through the score, and output the appropriate 
 //waveforms, until stopped or finished.
 void play_song() {
-	//Enable the amplifier
-	audio_disable = 0;
+	stop = 0;
+	finished = 0;
 
 	while(!stop) {
 		//Is the button pressed?
-		if (!button) break;
+		#ifndef DEBUG_WITHOUT_BUTTONS
+			if (!button) break;
+		#endif
 
 		//Has the melody finished playing?
 		if (finished && !decay[0] && !decay[1] && !decay[2] && !decay[3])
@@ -317,25 +328,20 @@ void play_song() {
 			PROCESS_CHANNEL(3)
 
 			//Send the output to the serial port or the PWM dc
-			#ifdef USART_DEBUG
+			#ifdef DEBUG_WITH_USART
 				//Output only 8-bit data
-				//output = output>>2;
-				while(BusyUSART());
-				putcUSART( (GET_UCHAR(output,1)>>4) + 0x30 );
-				while(BusyUSART());
-				putcUSART( (GET_UCHAR(output,1)&0x0F) + 0x30 );
+				output = ((output+CHANNEL_COUNT*128)>>2);
 				while(BusyUSART());
 				putcUSART( (GET_UCHAR(output,0)>>4) + 0x30 );
 				while(BusyUSART());
 				putcUSART( (GET_UCHAR(output,0)&0x0F) + 0x30 );
 			#else
 				//Update the PWM duty cycle
-				SetDCPWM1(output); 
+				//(At this speed, only 8 bits of resolution are 
+				// available, so don't bother with the full precision.
+				CCPR1L = (unsigned char)((output+CHANNEL_COUNT*0x80)>>2);
 			#endif
 		}
 	}
-	
-	//Disable the amplifier
-	audio_disable = 1;
 }		
 	

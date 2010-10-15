@@ -35,7 +35,8 @@ file_007=tests
 file_008=tests
 file_009=tests
 file_010=tests
-file_011=.
+file_011=tests
+file_012=.
 [GENERATED_FILES]
 file_000=no
 file_001=no
@@ -49,6 +50,7 @@ file_008=no
 file_009=no
 file_010=no
 file_011=no
+file_012=no
 [OTHER_FILES]
 file_000=no
 file_001=no
@@ -62,6 +64,7 @@ file_008=no
 file_009=no
 file_010=no
 file_011=no
+file_012=no
 [FILE_INFO]
 file_000=charlie.c
 file_001=envelopes.h
@@ -74,7 +77,8 @@ file_007=tests\test3.h
 file_008=tests\test4.h
 file_009=tests\test5.h
 file_010=tests\test6.h
-file_011=C:\Program Files\Microchip\MCC18\bin\LKR\18f1320_g.lkr
+file_011=tests\test0.h
+file_012=C:\Program Files\Microchip\MCC18\bin\LKR\18f1320_g.lkr
 [SUITE_INFO]
 suite_guid={5B7D72DD-9861-47BD-9F60-2BE967BF8416}
 suite_state=

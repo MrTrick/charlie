@@ -31,21 +31,21 @@ Any
 &
 ## ASYNCH
 Pin
-RB7
+RB5
 Pulse Low
 1 cyc
 
 -1
 --
 Pin
-RB7
+RB5
 Set High
 
 
 -1
 --
 Pin
-RB7
+RB5
 Set Low
 
 
