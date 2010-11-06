@@ -1,6 +1,6 @@
 //#define DEBUG_WITH_USART
 //#define DEBUG_WITHOUT_BUTTONS
-//#define TESTFILE "tests/test2.h"
+#define TESTFILE "tests/test2.h"
 //----------------------------------------------------------------
 //
 // Charlie
@@ -156,7 +156,7 @@ void main() {
 			score_init();
 		#endif
 	
-		//Play the song in its entirety, unless the 
+		//Play the song in its entirety, unless the button is pressed
 		play_song();
 
 		#ifndef DEBUG_WITHOUT_BUTTONS
@@ -192,6 +192,7 @@ void score_init() {
 
 	//Prep the first note to play immediately
 	tempo_scaling = 1;
+	delta.v = 0;
 }
 
 //Called periodically, plays new notes at the right time.
@@ -342,7 +343,7 @@ void play_song() {
 				//Update the PWM duty cycle
 				//(At this speed, only 8 bits of resolution are 
 				// available, so don't bother with the full precision.
-				CCPR1L = (unsigned char)((output+CHANNEL_COUNT*0x80)>>2);
+				CCPR1L = (unsigned char)((output+CHANNEL_COUNT*128)>>2);
 			#endif
 		}
 	}
