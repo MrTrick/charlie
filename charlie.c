@@ -1,6 +1,6 @@
 //#define DEBUG_WITH_USART
 //#define DEBUG_WITHOUT_BUTTONS
-#define TESTFILE "tests/test2.h"
+//#define TESTFILE "tests/test2.h"
 //----------------------------------------------------------------
 //
 // Charlie
@@ -13,7 +13,6 @@
 // Runs at 40MHz - needs a 10Mhz crystal, and is multiplied internally.
 //
 //----------------------------------------------------------------
-
 #include <p18f1320.h>
 #include <pwm.h> 
 #include <timers.h>
@@ -88,6 +87,7 @@ near unsigned char current_channel;
 //----------------------------------------------------------------
 // IO vars
 #define button PORTBbits.RB5
+#define not_amp_en TRISAbits.TRISA0
 //----------------------------------------------------------------
 #ifdef TESTFILE
 	#include TESTFILE
@@ -117,6 +117,8 @@ void init() {
 	ADCON1 = 0xFF;				//Disable the analog pins
 	INTCON2bits.NOT_RBPU = 0;	//Allow weak pull-ups
 	INTCONbits.RBIE = 1; 		//Enable interrupt-on-change for RB4:7
+	PORTAbits.RA0 = 0;			//Set RA0 low
+	not_amp_en = 1;				//Amplifier initially disabled (amplifier operates through low/hi impedance)
 }
 
 
@@ -157,7 +159,10 @@ void main() {
 		#endif
 	
 		//Play the song in its entirety, unless the button is pressed
+		not_amp_en = 0;
 		play_song();
+		not_amp_en = 1;
+		CCPR1L = 0; //Ensure the pwm duty cycle is cleared
 
 		#ifndef DEBUG_WITHOUT_BUTTONS
 			//Make sure the button is released 
